@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from attest_svc import router as attest_router
+from approval_svc import router as approval_router
 from audit_svc import router as audit_router
 from auth import router as auth_router
 from bonds_svc import router as bonds_router
@@ -43,6 +44,7 @@ for r in (
     audit_router,
     topup_router,
     split_router,
+    approval_router,
 ):
     app.include_router(r)
 

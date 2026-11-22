@@ -14,6 +14,7 @@ createApp({
   setup() {
     const token = ref(localStorage.getItem("bondcage_token") || "");
     const user = ref(localStorage.getItem("bondcage_user") || "");
+    const role = ref(localStorage.getItem("bondcage_role") || "");
     const username = ref("admin");
     const password = ref("123456");
     const err = ref("");
@@ -48,6 +49,7 @@ createApp({
     const selectedCage = ref(null);
     const topupJobs = ref([]);
     const splitJobs = ref([]);
+    const approvals = ref([]);
 
     const bondForm = ref({
       party_key: "P-NEW",
@@ -96,8 +98,10 @@ createApp({
     function logout() {
       token.value = "";
       user.value = "";
+      role.value = "";
       localStorage.removeItem("bondcage_token");
       localStorage.removeItem("bondcage_user");
+      localStorage.removeItem("bondcage_role");
     }
 
     const api = createApi(
@@ -142,6 +146,23 @@ createApp({
       )
     );
 
+    const isAdmin = computed(() => role.value === "admin");
+    const canDirectWithdraw = computed(() => isAdmin.value);
+    const pendingApprovals = computed(() =>
+      approvals.value.filter((a) => a.status === "待审批")
+    );
+    const pendingReleases = computed(() =>
+      pendingApprovals.value.filter((a) => a.kind === "release")
+    );
+    const pendingForfeits = computed(() =>
+      pendingApprovals.value.filter((a) => a.kind === "forfeit")
+    );
+    const shadowNote = computed(() =>
+      canDirectWithdraw.value
+        ? ""
+        : "当前账号无出金写权：只能提交审批影子单，管理员批准后由服务端代写。"
+    );
+
     async function login() {
       err.value = "";
       const r = await fetch("/api/login", {
@@ -159,8 +180,10 @@ createApp({
       }
       token.value = j.token;
       user.value = j.username;
+      role.value = j.role || "";
       localStorage.setItem("bondcage_token", j.token);
       localStorage.setItem("bondcage_user", j.username);
+      localStorage.setItem("bondcage_role", role.value);
       await refresh();
     }
 
@@ -195,6 +218,7 @@ createApp({
           lk,
           tj,
           sj,
+          ap,
         ] = await Promise.all([
           api.bonds(),
           api.cages(),
@@ -207,6 +231,7 @@ createApp({
           api.locks(),
           api.topupJobs(),
           api.splitJobs(),
+          api.approvals(),
         ]);
         bonds.value = b.items || [];
         cages.value = c.items || [];
@@ -219,6 +244,7 @@ createApp({
         locks.value = lk.items || [];
         topupJobs.value = tj.items || [];
         splitJobs.value = sj.items || [];
+        approvals.value = ap.items || [];
         if (!attestForm.value.cage_id && frozenCages.value.length) {
           attestForm.value.cage_id = frozenCages.value[0].id;
         }
@@ -342,6 +368,38 @@ createApp({
       }
     }
 
+    async function requestDecision(kind) {
+      clearFlash();
+      const form = kind === "release" ? releaseForm.value : forfeitForm.value;
+      try {
+        if (!form.cage_id) throw new Error("请选择笼");
+        const payload = { kind, cage_id: form.cage_id };
+        if (form.amount) payload.amount = form.amount;
+        if (kind === "release" && form.payee) payload.payee = form.payee;
+        if (kind === "forfeit" && form.reason) payload.reason = form.reason;
+        const row = await api.requestApproval(payload);
+        flashOk(`审批影子单已提交 #${row.id}（待管理员批准）`);
+        await refresh();
+      } catch (e) {
+        flashErr(e);
+      }
+    }
+
+    async function decideApproval(row, decision) {
+      clearFlash();
+      try {
+        const d = await api.decideApproval(row.id, { decision });
+        flashOk(
+          decision === "approve"
+            ? `已批准 #${d.id}，服务端代写 ${d.resulting_ref || ""}`
+            : `已驳回 #${d.id}，正式册零改`
+        );
+        await refresh();
+      } catch (e) {
+        flashErr(e);
+      }
+    }
+
     async function loadReconcile() {
       clearFlash();
       try {
@@ -393,6 +451,7 @@ createApp({
     return {
       token,
       user,
+      role,
       username,
       password,
       err,
@@ -417,6 +476,10 @@ createApp({
       selectedCage,
       topupJobs,
       splitJobs,
+      approvals,
+      pendingApprovals,
+      pendingReleases,
+      pendingForfeits,
       bondForm,
       depositForm,
       freezeForm,
@@ -428,6 +491,9 @@ createApp({
       frozenCages,
       passCages,
       failCages,
+      isAdmin,
+      canDirectWithdraw,
+      shadowNote,
       login,
       logout,
       refresh,
@@ -442,6 +508,8 @@ createApp({
       doAttest,
       doRelease,
       doForfeit,
+      requestDecision,
+      decideApproval,
       loadReconcile,
       loadProof,
       doTopupStub,
@@ -468,7 +536,7 @@ createApp({
         <small>冻结 · 核验 · 解笼/罚没 · 对账</small>
       </div>
       <div class="top-meta">
-        <span>{{ user }}</span>
+        <span>{{ user }}<small v-if="role"> · {{ role }}</small></span>
         <button @click="refresh">刷新</button>
         <button @click="logout">退出</button>
       </div>

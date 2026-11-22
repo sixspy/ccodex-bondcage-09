@@ -2,6 +2,7 @@ export const releaseViewTemplate = `
 <section class="panel">
   <h2>解笼拨付</h2>
   <p class="hint">仅核验通过的笼可拨付。默认把可用额全额拨给受益人，也可部分解笼。账户余额与冻结同步扣减。</p>
+  <p class="hint auth-hint" v-if="shadowNote">{{ shadowNote }}</p>
   <div class="grid-2">
     <div>
       <div class="form-row">
@@ -24,7 +25,28 @@ export const releaseViewTemplate = `
         </div>
       </div>
       <div class="actions">
-        <button class="ok" @click="doRelease">解笼拨付</button>
+        <button v-if="canDirectWithdraw" class="ok" @click="doRelease">解笼拨付</button>
+        <button v-else class="secondary" @click="requestDecision('release')">提交审批影子单</button>
+      </div>
+      <div class="approval-box" v-if="pendingReleases.length">
+        <h3>待审批影子单</h3>
+        <table>
+          <thead><tr><th>#</th><th>类型</th><th>笼</th><th>金额</th><th>申请人</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr v-for="a in pendingReleases" :key="'ra'+a.id">
+              <td>{{ a.id }}</td>
+              <td>{{ a.kind === 'release' ? '解笼拨付' : '罚没' }}</td>
+              <td>{{ a.cage_code }}</td>
+              <td>{{ a.amount == null ? '全额' : fmt(a.amount) }}</td>
+              <td>{{ a.requested_by }}<small v-if="a.requested_role"> · {{ a.requested_role }}</small></td>
+              <td v-if="isAdmin">
+                <button class="ok" @click="decideApproval(a,'approve')">批准</button>
+                <button class="danger" @click="decideApproval(a,'reject')">驳回</button>
+              </td>
+              <td v-else><span class="badge frozen">待管理员</span></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
     <div>

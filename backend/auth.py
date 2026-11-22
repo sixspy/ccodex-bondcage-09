@@ -52,7 +52,8 @@ def require_user(authorization: str | None) -> str:
     return data["u"]
 
 
-def require_writer(authorization: str | None) -> str:
+def role_of(authorization: str | None) -> tuple[str, str]:
+    """返回 (username, role)，以库内角色为准（不信任令牌里的旧角色）。"""
     user = require_user(authorization)
     with connect() as conn:
         row = conn.execute(
@@ -60,18 +61,40 @@ def require_writer(authorization: str | None) -> str:
         ).fetchone()
     if not row:
         raise HTTPException(401, "用户不存在")
-    if row["role"] == "viewer":
+    return user, row["role"]
+
+
+def _audit_reject(user: str, role: str, action: str, payload: dict) -> None:
+    """越权偏航独立落库：请求随即 403，痕迹不能被回滚吃掉。"""
+    with connect() as conn:
+        write_audit(conn, user, "越权偏航", action, {"role": role, **payload})
+        conn.commit()
+
+
+def require_writer(authorization: str | None) -> str:
+    """非出金类写口：admin 与 clerk 可用，viewer 拒绝。"""
+    user, role = role_of(authorization)
+    if role not in ("admin", "clerk"):
+        _audit_reject(user, role, "general_write", {})
         raise HTTPException(403, "只读账号禁止写入")
     return user
 
 
+def require_withdrawal_writer(authorization: str | None, action: str) -> str:
+    """出金类写口：仅 admin 可直接写；无出金写权角色零写入并记越权偏航。"""
+    user, role = role_of(authorization)
+    if role != "admin":
+        _audit_reject(user, role, action, {})
+        raise HTTPException(
+            403, "无出金写权：出金写口禁止直接写入，请走审批影子单"
+        )
+    return user
+
+
 def require_admin(authorization: str | None) -> str:
-    user = require_user(authorization)
-    with connect() as conn:
-        row = conn.execute(
-            "SELECT role FROM users WHERE username=?", (user,)
-        ).fetchone()
-    if not row or row["role"] != "admin":
+    user, role = role_of(authorization)
+    if role != "admin":
+        _audit_reject(user, role, "admin_only", {})
         raise HTTPException(403, "需要管理员")
     return user
 

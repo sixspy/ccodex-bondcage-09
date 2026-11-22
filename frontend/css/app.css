@@ -361,3 +361,14 @@ th {
   margin-bottom: 12px;
   font-size: 13px;
 }
+
+.auth-hint {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.approval-box {
+  margin-top: 14px;
+  border-top: 1.5px dashed var(--line, #cbd5e1);
+  padding-top: 8px;
+}

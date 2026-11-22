@@ -159,6 +159,24 @@ CREATE TABLE IF NOT EXISTS deposit_ledger(
   created_at TEXT NOT NULL,
   actor TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS approval_requests(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  cage_id INTEGER NOT NULL,
+  amount REAL,
+  payee TEXT,
+  reason TEXT,
+  note TEXT,
+  status TEXT NOT NULL,
+  requested_by TEXT NOT NULL,
+  requested_role TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  decided_by TEXT,
+  decided_at TEXT,
+  decision_note TEXT,
+  resulting_ref TEXT,
+  FOREIGN KEY(cage_id) REFERENCES cages(id)
+);
 """
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from auth import AuthHeader, require_user, require_writer
+from auth import AuthHeader, require_user, require_withdrawal_writer
 from db import connect, now_iso, write_audit
 from locks import release, require_lock
 from models import TopupIn
@@ -29,7 +29,7 @@ def topup_stub(body: TopupIn, authorization: AuthHeader = None):
     空桩：题面落地前禁止真正扩额。
     允许登记 job，但 cages.amount / available 与 bond_accounts 保持不变。
     """
-    user = require_writer(authorization)
+    user = require_withdrawal_writer(authorization, "cage_topup")
     if body.mode not in ("同笼扩代", "新笼桥接"):
         raise HTTPException(400, "mode 须为同笼扩代或新笼桥接")
     lock_key = f"cage:{body.cage_id}"

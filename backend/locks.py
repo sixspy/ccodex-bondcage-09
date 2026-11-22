@@ -45,6 +45,8 @@ def release(conn, lock_key: str, holder: str) -> None:
 
 def require_lock(conn, lock_key: str, holder: str) -> None:
     if not try_acquire(conn, lock_key, holder):
+        # 争用痕是先落库的只读痕迹：必须挺过随后的事务回滚，不能被 409 吃掉。
+        conn.commit()
         raise HTTPException(409, "争用：后到只记争用，不写业务")
 
 

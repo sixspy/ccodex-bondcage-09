@@ -16,14 +16,24 @@
 | 目录 | `11-bondcage` |
 | 接口 | http://127.0.0.1:11319 |
 | 库 | `data/app.db` |
-| 账号 | admin / clerk / viewer ，密码均为 123456（viewer 只读） |
+| 账号 | admin / clerk / viewer ，密码均为 123456（viewer 只读；clerk 无出金写权） |
+
+## 越权写闸（2026-11-22 锁定）
+
+见 `ops/越权写闸纪要.md`。口径：**乙路径——审批影子 + 服务端代写**。
+
+- 出金类写口（`/api/releases`、`/api/forfeits`、`/api/topup-stub`、`/api/split-stub`）仅 `admin` 可直接写。
+- `clerk` / `viewer` 在鉴权层被拒（403），业务表零增，只落审计 `越权偏航`；可建审批影子单（`/api/approvals`）。
+- 管理员批准后由服务端在同一事务内代写正式拨付/罚没；驳回则影子作废、正式表零改。
+- 两写角色同笼争用：后到 409，仅留 `contention_log` 争用痕，业务零增。
+- 复现夹具：`python scripts/repro_unauthorized_release.py --expect denied`（跑本机文件库副本）。
 
 ## 厚度
 
 | 项 | 内容 |
 |----|------|
 | 业务 LOC | **≥2900**（py+前端，不含 vue.global / Docker / README；自检约 2984） |
-| 后端模块 | db / auth / locks / bonds_svc / cages_svc / attest_svc / release_svc / forfeit_svc / reconcile_svc / audit_svc / topup_svc / split_svc |
+| 后端模块 | db / auth / locks / bonds_svc / cages_svc / attest_svc / release_svc / forfeit_svc / reconcile_svc / audit_svc / approval_svc / topup_svc / split_svc |
 | 前端视图 | 保证金户 / 入笼冻结 / 履约核验 / 解笼拨付 / 罚没册 / 对账互证 / 审计争用 / 增补拆笼空桩（8 页） |
 | 空桩 | topup（增补入笼）、split（拆笼分拨）——前后端均有 |
 

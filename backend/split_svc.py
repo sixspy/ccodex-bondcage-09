@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from auth import AuthHeader, require_user, require_writer
+from auth import AuthHeader, require_user, require_withdrawal_writer
 from db import connect, now_iso, write_audit
 from locks import release, require_lock
 from models import SplitIn
@@ -25,7 +25,7 @@ def list_jobs(authorization: AuthHeader = None):
 
 @router.post("/api/split-stub")
 def split_stub(body: SplitIn, authorization: AuthHeader = None):
-    user = require_writer(authorization)
+    user = require_withdrawal_writer(authorization, "cage_split")
     if body.mode not in ("整笔切分", "影子子笼"):
         raise HTTPException(400, "mode 须为整笔切分或影子子笼")
     lock_key = f"cage:{body.cage_id}"

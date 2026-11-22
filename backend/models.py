@@ -42,6 +42,20 @@ class ForfeitIn(BaseModel):
     reason: str = "履约违约"
 
 
+class ApprovalRequestIn(BaseModel):
+    kind: str = Field(pattern="^(release|forfeit)$")
+    cage_id: int
+    amount: float | None = None
+    payee: str | None = None
+    reason: str | None = None
+    note: str | None = None
+
+
+class ApprovalDecisionIn(BaseModel):
+    decision: str = Field(pattern="^(approve|reject)$")
+    note: str | None = None
+
+
 class TopupIn(BaseModel):
     cage_id: int
     amount: float = Field(gt=0)
